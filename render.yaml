@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: pca-image-comparison
-    runtime: python
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.11
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn api.index:app

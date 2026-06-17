@@ -4,7 +4,9 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify, render_template
 from sklearn.metrics.pairwise import cosine_similarity
-from deepface import DeepFace
+
+# Ganti deepface dengan insightface (ONNX backend)
+from insightface.app import FaceAnalysis
 
 app = Flask(__name__, template_folder='../templates')
 
@@ -16,23 +18,25 @@ def page_not_found(e):
 def internal_server_error(e):
     return jsonify({"error": "Terjadi kesalahan internal di server backend Vercel."}), 500
 
-# KALIBRASI THRESHOLD: Untuk wajah beda usia (anak vs dewasa) dengan PCA, 
-# nilai 0.58 - 0.60 adalah titik potong optimal agar tidak terjadi False Rejection.
 SIMILARITY_THRESHOLD = 0.50
+
+
+print("Memuat model ONNX Face Recognition...")
+# face_app = FaceAnalysis(name='buffalo_sc', providers=['CPUExecutionProvider'])
+face_app = FaceAnalysis(name='buffalo_sc', root='/tmp/.insightface', providers=['CPUExecutionProvider'])
+
+face_app.prepare(ctx_id=0, det_size=(640, 640))
 
 def enhance_image_for_old_photos(img_array):
     """
     Fungsi untuk memperbaiki kontras foto lama (masa kecil) menggunakan CLAHE.
     """
-    # Konversi ke LAB color space
     lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
     l_channel, a_channel, b_channel = cv2.split(lab)
     
-    # Terapkan CLAHE hanya pada L-channel (Lightness) agar warna tidak rusak
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     cl = clahe.apply(l_channel)
     
-    # Gabungkan kembali dan konversi ke BGR
     merged = cv2.merge((cl, a_channel, b_channel))
     enhanced_img = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
     return enhanced_img
@@ -50,7 +54,7 @@ if os.path.exists(model_path):
         pca_model = data_model["pca_model"]
         is_model_ready = True
     except Exception as e:
-        print(f"Error memuat model: {str(e)}")
+        print(f"Error memuat model PCA: {str(e)}")
 
 @app.route('/', methods=['GET'])
 def index():
@@ -68,7 +72,7 @@ def compare_faces(any_path=None):
     file1 = request.files['file1']
     file2 = request.files['file2']
     
-    def get_deepface_embedding(file_obj):
+    def get_onnx_embedding(file_obj):
         if file_obj.filename == '':
             return None, "Berkas kosong."
             
@@ -79,29 +83,30 @@ def compare_faces(any_path=None):
         if img is None:
             return None, "Gagal membaca format gambar."
             
-        try:
-            # UPGRADE 1: Tambahkan align=True untuk meluruskan rotasi wajah
-            results = DeepFace.represent(
-                img, 
-                model_name="ArcFace", 
-                enforce_detection=True, 
-                align=True 
-            )
-            return results[0]["embedding"], None
-        except ValueError:
+        # Optional: Terapkan CLAHE jika mendeteksi foto lama
+        # img = enhance_image_for_old_photos(img)
+            
+        # Ekstraksi fitur menggunakan ONNX
+        faces = face_app.get(img)
+        
+        if len(faces) == 0:
             return None, "Wajah tidak terdeteksi di salah satu foto."
+            
+        # Ambil wajah pertama/terbesar yang terdeteksi
+        # InsightFace otomatis melakukan alignment (meluruskan wajah)
+        return faces[0].normed_embedding, None
 
-    emb1, err1 = get_deepface_embedding(file1)
+    emb1, err1 = get_onnx_embedding(file1)
     if err1: return jsonify({"error": err1}), 400
         
-    emb2, err2 = get_deepface_embedding(file2)
+    emb2, err2 = get_onnx_embedding(file2)
     if err2: return jsonify({"error": err2}), 400
         
     try:
-        # 1. Hitung Kemiripan dari Fitur ArcFace Murni (Sangat kuat untuk beda usia)
-        sim_arcface = float(cosine_similarity([emb1], [emb2])[0][0])
+        # 1. Hitung Kemiripan dari Fitur ONNX Murni (Cosine Similarity)
+        sim_onnx = float(cosine_similarity([emb1], [emb2])[0][0])
 
-        # 2. Transformasi vektor ArcFace lewat "kacamata" PCA (Sesuai syarat modelmu)
+        # 2. Transformasi vektor lewat PCA
         vec1 = pca_model.transform([emb1])[0]
         vec2 = pca_model.transform([emb2])[0]
         
@@ -109,16 +114,11 @@ def compare_faces(any_path=None):
         sim_pca = float(cosine_similarity([vec1], [vec2])[0][0])
         eucl_dist = float(np.linalg.norm(vec1 - vec2))
         
-        # UPGRADE 2: HYBRID SCORING (Ensemble)
-        # Kita ambil 70% keputusan dari ArcFace yang kebal usia, dan 30% dari PCA
-        hybrid_score = (sim_arcface * 0.70) + (sim_pca * 0.30)
-        
-        # Normalisasi agar tidak minus
+        # HYBRID SCORING (Ensemble)
+        hybrid_score = (sim_onnx * 0.70) + (sim_pca * 0.30)
         display_similarity = max(0.0, hybrid_score)
-        
         is_match = bool(display_similarity >= SIMILARITY_THRESHOLD)
         
-        # Penyesuaian label keyakinan yang lebih realistis untuk hybrid score
         if display_similarity >= 0.70: confidence = "Sangat Tinggi"
         elif display_similarity >= 0.60: confidence = "Tinggi"
         elif display_similarity >= SIMILARITY_THRESHOLD: confidence = "Sedang"
