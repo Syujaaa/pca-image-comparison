@@ -69,7 +69,9 @@ if os.path.exists(model_path):
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
-
+@app.route("/health")
+def health():
+    return {"status": "ok"}
 @app.route('/api/compare', methods=['POST'])
 @app.route('/compare', methods=['POST'])
 def compare_faces(any_path=None):
