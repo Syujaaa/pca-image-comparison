@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: pca-image-comparison
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn api.index:app

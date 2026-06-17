@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioID - Face Comparison System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            transition: background-color 0.3s, color 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col justify-between antialiased">
+
+    <!-- Header -->
+    <header class="w-full max-w-7xl mx-auto px-6 py-5 flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-600/20">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </div>
+            <div>
+                <span class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">BioID</span>
+                <span data-i18n="subtitle" class="text-xs block text-indigo-600 dark:text-indigo-400 font-bold tracking-wider uppercase">Sistem Perbandingan Wajah masa kecil dan saat ini</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- Language Button -->
+            <button id="lang-toggle" class="flex items-center justify-center px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold transition-all shadow-sm">
+                EN
+            </button>
+            
+            <!-- Dark / Light Toggle -->
+            <button id="theme-toggle" class="flex items-center justify-center p-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 transition-all shadow-sm">
+                <!-- Sun Icon -->
+                <svg id="icon-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <!-- Moon Icon -->
+                <svg id="icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 flex-grow">
+        <!-- Title Info -->
+        <div class="text-center mb-8">
+            <h2 data-i18n="mainTitle" class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Perbandingan Wajah</h2>
+            <p data-i18n="mainDesc" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Unggah foto masa kecil & foto sekarang untuk dibandingkan secara otomatis</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Left Side: Upload Zone (2 Slots) -->
+            <div class="lg:col-span-7 space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    <!-- Slot Foto A -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
+                        <span data-i18n="labelPhotoA" class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block mb-3">Foto A (Masa Kecil)</span>
+                        <div id="drop-zone-a" class="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-950/30 flex flex-col items-center justify-center min-h-[160px]">
+                            <div id="upload-icon-a" class="text-slate-400 mb-2">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                            </div>
+                            <p id="upload-text-a" data-i18n="uploadText" class="text-xs text-slate-500 font-semibold">Tarik & lepas atau Klik</p>
+                            <img id="preview-img-a" class="hidden w-32 h-32 object-cover rounded-lg shadow-md border border-slate-200 dark:border-slate-800" src="" alt="Pratinjau A">
+                            <input type="file" id="file-input-a" class="hidden" accept="image/*">
+                        </div>
+                        <div id="status-badge-a" class="hidden mt-3 flex items-center justify-center gap-1.5 py-1 px-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-lg text-xs font-semibold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span data-i18n="faceDetected">✓ Wajah Terdeteksi</span>
+                        </div>
+                    </div>
+
+                    <!-- Slot Foto B -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
+                        <span data-i18n="labelPhotoB" class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block mb-3">Foto B (Sekarang)</span>
+                        <div id="drop-zone-b" class="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-950/30 flex flex-col items-center justify-center min-h-[160px]">
+                            <div id="upload-icon-b" class="text-slate-400 mb-2">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                            </div>
+                            <p id="upload-text-b" data-i18n="uploadText" class="text-xs text-slate-500 font-semibold">Tarik & lepas atau Klik</p>
+                            <img id="preview-img-b" class="hidden w-32 h-32 object-cover rounded-lg shadow-md border border-slate-200 dark:border-slate-800" src="" alt="Pratinjau B">
+                            <input type="file" id="file-input-b" class="hidden" accept="image/*">
+                        </div>
+                        <div id="status-badge-b" class="hidden mt-3 flex items-center justify-center gap-1.5 py-1 px-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-lg text-xs font-semibold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span data-i18n="faceDetected">✓ Wajah Terdeteksi</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Compare Button -->
+                <button id="compare-btn" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                    <span id="btn-text" data-i18n="compareBtn">Bandingkan Wajah</span>
+                    <div id="btn-spinner" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin hidden"></div>
+                </button>
+
+                <!-- Error Alert -->
+                <div id="error-alert" class="hidden bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl">
+                    <p id="error-message" class="text-xs text-rose-600 dark:text-rose-400 font-semibold"></p>
+                </div>
+            </div>
+
+            <!-- Right Side: Diagnostics & Comparison Results -->
+            <div class="lg:col-span-5">
+                <!-- Waiting State -->
+                <div id="empty-state" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-10 text-center flex flex-col items-center justify-center min-h-[300px] shadow-sm">
+                    <div class="text-slate-400 mb-3">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    </div>
+                    <h3 data-i18n="waitingTitle" class="text-sm font-bold text-slate-800 dark:text-slate-200">Hasil Evaluasi Perbandingan</h3>
+                    <p data-i18n="waitingDesc" class="text-xs text-slate-500 max-w-[240px] mt-1 mx-auto">Silakan pilih kedua foto wajah lalu klik Bandingkan Wajah untuk menganalisis kesamaan.</p>
+                </div>
+
+                <!-- Results Output Card -->
+                <div id="result-card" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-md space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <span data-i18n="diagHeader" class="text-[10px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 uppercase">Hasil Diagnostik</span>
+                        <button id="reset-btn" data-i18n="resetBtn" class="text-[11px] font-bold text-rose-500 hover:underline">Mulai ulang</button>
+                    </div>
+
+                    <!-- Decision Block -->
+                    <div class="flex items-center gap-4 p-4 rounded-xl" id="decision-block">
+                        <div id="decision-icon" class="w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm"></div>
+                        <div>
+                            <h4 id="decision-title" class="text-lg font-extrabold tracking-tight">Status Pengenalan</h4>
+                            <p id="decision-desc" class="text-xs text-slate-500 dark:text-slate-400">Deskripsi status.</p>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Progress Bar -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-end">
+                            <span data-i18n="metricSimilarity" class="text-xs font-bold text-slate-500 dark:text-slate-400">Tingkat Kemiripan (Cosine)</span>
+                            <span id="similarity-score" class="text-base font-mono font-black text-indigo-600 dark:text-indigo-400">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-slate-950 rounded-full h-3 p-0.5 border border-slate-200 dark:border-slate-800/80">
+                            <div id="similarity-bar" class="h-2 rounded-full transition-all duration-1000 bg-gradient-to-r from-indigo-500 to-violet-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Numeric Details Grid -->
+                    <div class="grid grid-cols-3 gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/40 text-center">
+                            <span data-i18n="distLabel" class="text-[9px] font-bold text-slate-500 uppercase block mb-1">Jarak Euclidean</span>
+                            <span id="metric-dist" class="text-sm font-mono font-bold text-slate-800 dark:text-slate-100">0.00</span>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/40 text-center">
+                            <span data-i18n="threshLabel" class="text-[9px] font-bold text-slate-500 uppercase block mb-1">Ambang Batas</span>
+                            <span id="metric-thresh" class="text-sm font-mono font-bold text-slate-800 dark:text-slate-100">0.80</span>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/40 text-center">
+                            <span data-i18n="confLabel" class="text-[9px] font-bold text-slate-500 uppercase block mb-1">Keyakinan</span>
+                            <span id="metric-conf" class="text-xs font-bold text-indigo-600 dark:text-indigo-400">Tinggi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-5 text-center text-xs text-slate-500 border-t border-slate-200 dark:border-slate-800/60">
+        <p data-i18n="footer">&copy; 2026 BioID Core System. Project penerapan PCA Mata Kuliah Aljabar Linear.</p>
+    </footer>
+
+    <script>
+        // --- Translations ---
+        const translations = {
+            id: {
+                subtitle: "Sistem Perbandingan Wajah",
+                mainTitle: "Perbandingan Wajah",
+                mainDesc: "Unggah foto masa kecil & foto sekarang untuk dibandingkan secara otomatis",
+                labelPhotoA: "Foto A (Masa Kecil)",
+                labelPhotoB: "Foto B (Sekarang)",
+                uploadText: "Tarik & lepas atau Klik",
+                faceDetected: "✓ Wajah Terdeteksi",
+                compareBtn: "Bandingkan Wajah",
+                comparingBtn: "Menganalisis Geometri, Tunggu sebentar...",
+                waitingTitle: "Hasil Evaluasi Perbandingan",
+                waitingDesc: "Silakan pilih kedua foto wajah lalu klik Bandingkan Wajah untuk menganalisis kesamaan.",
+                diagHeader: "Hasil Diagnostik",
+                resetBtn: "Mulai ulang",
+                matchOk: "Orang yang Sama",
+                matchNo: "Orang yang Berbeda",
+                descOk: "Wajah teridentifikasi cocok",
+                descNo: "Wajah teridentifikasi tidak cocok",
+                metricSimilarity: "Tingkat Kemiripan (Cosine)",
+                distLabel: "Jarak Euclidean",
+                threshLabel: "Ambang Batas",
+                confLabel: "Keyakinan",
+                footer: "© 2026 BioID Core System. Project penerapan PCA Mata Kuliah Aljabar Linear. Foto tidak disimpan pada server kami"
+            },
+            en: {
+                subtitle: "Cross-Age Face Verification System",
+                mainTitle: "Face Comparison",
+                mainDesc: "Upload childhood & current photo to compare them automatically",
+                labelPhotoA: "Photo A (Childhood)",
+                labelPhotoB: "Photo B (Current)",
+                uploadText: "Drag & drop or Click",
+                faceDetected: "✓ Face Detected",
+                compareBtn: "Compare Faces",
+                comparingBtn: "Analyzing Geometry...",
+                waitingTitle: "Comparison Evaluation",
+                waitingDesc: "Please select both face photos then click Compare Faces to analyze similarity.",
+                diagHeader: "Diagnostic Output",
+                resetBtn: "Reset",
+                matchOk: "Same Person",
+                matchNo: "Different Person",
+                descOk: "Face identified as a match",
+                descNo: "Face identified as not a match",
+                metricSimilarity: "Similarity Rate (Cosine)",
+                distLabel: "Euclidean Distance",
+                threshLabel: "Threshold",
+                confLabel: "Confidence",
+                footer: "© 2026 BioID Core System. PCA Implementation Project for Linear Algebra Course. Pictures are not stored on our server"
+            }
+        };
+
+        let currentLang = 'id';
+        let fileA = null;
+        let fileB = null;
+
+        const langToggleBtn = document.getElementById('lang-toggle');
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const iconSun = document.getElementById('icon-sun');
+        const iconMoon = document.getElementById('icon-moon');
+        const html = document.documentElement;
+
+        // Apply Lang
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[currentLang][key]) {
+                    el.textContent = translations[currentLang][key];
+                }
+            });
+            document.getElementById('upload-text-a').textContent = translations[currentLang].uploadText;
+            document.getElementById('upload-text-b').textContent = translations[currentLang].uploadText;
+        }
+
+        langToggleBtn.addEventListener('click', () => {
+            currentLang = currentLang === 'id' ? 'en' : 'id';
+            langToggleBtn.textContent = currentLang === 'id' ? 'EN' : 'ID';
+            applyTranslations();
+        });
+
+        // Theme Toggle (Pure HTML/Body sync to prevent broken colors)
+        themeToggleBtn.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            if (isDark) {
+                iconSun.classList.remove('hidden');
+                iconMoon.classList.add('hidden');
+            } else {
+                iconSun.classList.add('hidden');
+                iconMoon.classList.remove('hidden');
+            }
+        });
+
+        // Upload Slot A
+        const dZoneA = document.getElementById('drop-zone-a');
+        const inputA = document.getElementById('file-input-a');
+        const previewImgA = document.getElementById('preview-img-a');
+        const iconA = document.getElementById('upload-icon-a');
+        const textA = document.getElementById('upload-text-a');
+        const badgeA = document.getElementById('status-badge-a');
+
+        dZoneA.addEventListener('click', () => inputA.click());
+        inputA.addEventListener('change', (e) => handleFile(e.target.files[0], 'A'));
+        dZoneA.addEventListener('dragover', (e) => { e.preventDefault(); dZoneA.classList.add('border-indigo-500'); });
+        dZoneA.addEventListener('dragleave', () => dZoneA.classList.remove('border-indigo-500'));
+        dZoneA.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dZoneA.classList.remove('border-indigo-500');
+            handleFile(e.dataTransfer.files[0], 'A');
+        });
+
+        // Upload Slot B
+        const dZoneB = document.getElementById('drop-zone-b');
+        const inputB = document.getElementById('file-input-b');
+        const previewImgB = document.getElementById('preview-img-b');
+        const iconB = document.getElementById('upload-icon-b');
+        const textB = document.getElementById('upload-text-b');
+        const badgeB = document.getElementById('status-badge-b');
+
+        dZoneB.addEventListener('click', () => inputB.click());
+        inputB.addEventListener('change', (e) => handleFile(e.target.files[0], 'B'));
+        dZoneB.addEventListener('dragover', (e) => { e.preventDefault(); dZoneB.classList.add('border-indigo-500'); });
+        dZoneB.addEventListener('dragleave', () => dZoneB.classList.remove('border-indigo-500'));
+        dZoneB.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dZoneB.classList.remove('border-indigo-500');
+            handleFile(e.dataTransfer.files[0], 'B');
+        });
+
+        function handleFile(file, slot) {
+            if (!file) return;
+            if (slot === 'A') {
+                fileA = file;
+                previewImgA.src = URL.createObjectURL(file);
+                previewImgA.classList.remove('hidden');
+                iconA.classList.add('hidden');
+                textA.classList.add('hidden');
+            } else {
+                fileB = file;
+                previewImgB.src = URL.createObjectURL(file);
+                previewImgB.classList.remove('hidden');
+                iconB.classList.add('hidden');
+                textB.classList.add('hidden');
+            }
+
+            if (fileA && fileB) {
+                document.getElementById('compare-btn').disabled = false;
+            }
+        }
+
+        // Action Compare
+        const compareBtn = document.getElementById('compare-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const emptyState = document.getElementById('empty-state');
+        const resultCard = document.getElementById('result-card');
+        const errorAlert = document.getElementById('error-alert');
+        const errorMessage = document.getElementById('error-message');
+
+        compareBtn.addEventListener('click', async () => {
+            if (!fileA || !fileB) return;
+
+            compareBtn.disabled = true;
+            btnText.textContent = translations[currentLang].comparingBtn;
+            btnSpinner.classList.remove('hidden');
+            errorAlert.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file1', fileA);
+            formData.append('file2', fileB);
+            formData.append('lang', currentLang);
+
+            try {
+                const response = await fetch('/compare', { method: 'POST', body: formData });
+                const res = await response.json();
+
+                if (!response.ok) throw new Error(res.error || "Gagal melakukan analisis.");
+
+                badgeA.classList.remove('hidden');
+                badgeB.classList.remove('hidden');
+                showResults(res);
+
+            } catch (err) {
+                errorMessage.textContent = err.message;
+                errorAlert.classList.remove('hidden');
+                resultCard.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+            } finally {
+                compareBtn.disabled = false;
+                btnText.textContent = translations[currentLang].compareBtn;
+                btnSpinner.classList.add('hidden');
+            }
+        });
+
+        function showResults(data) {
+            emptyState.classList.add('hidden');
+            resultCard.classList.remove('hidden');
+
+            const dBlock = document.getElementById('decision-block');
+            const dIcon = document.getElementById('decision-icon');
+            const dTitle = document.getElementById('decision-title');
+            const dDesc = document.getElementById('decision-desc');
+            const simScore = document.getElementById('similarity-score');
+            const simBar = document.getElementById('similarity-bar');
+
+            const scorePercent = (data.similarity * 100).toFixed(1);
+
+            // UBAH: data.is_same menjadi data.is_match
+            if (data.is_match) {
+                dBlock.className = "flex items-center gap-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20";
+                dIcon.className = "w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500 text-white shrink-0 shadow-sm";
+                dIcon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+                dTitle.textContent = translations[currentLang].matchOk;
+                dTitle.className = "text-lg font-black tracking-tight text-emerald-600 dark:text-emerald-400";
+                dDesc.textContent = translations[currentLang].descOk;
+                simBar.className = "h-2 rounded-full transition-all duration-1000 bg-gradient-to-r from-emerald-500 to-teal-500";
+            } else {
+                dBlock.className = "flex items-center gap-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20";
+                dIcon.className = "w-12 h-12 rounded-xl flex items-center justify-center bg-rose-500 text-white shrink-0 shadow-sm";
+                dIcon.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+                dTitle.textContent = translations[currentLang].matchNo;
+                dTitle.className = "text-lg font-black tracking-tight text-rose-600 dark:text-rose-400";
+                dDesc.textContent = translations[currentLang].descNo;
+                simBar.className = "h-2 rounded-full transition-all duration-1000 bg-gradient-to-r from-rose-500 to-orange-500";
+            }
+
+            // UBAH: data.euclidean_dist menjadi data.distance
+            // Karena dari backend index.py sudah dikirim dalam bentuk number (round), toFixed akan berjalan normal.
+            document.getElementById('metric-dist').textContent = data.distance.toFixed(3); 
+            document.getElementById('metric-thresh').textContent = data.threshold.toFixed(2);
+            document.getElementById('metric-conf').textContent = data.confidence;
+
+            // Animate bar
+            simScore.textContent = `0.0%`;
+            simBar.style.width = `0%`;
+            setTimeout(() => {
+                simScore.textContent = `${scorePercent}%`;
+                simBar.style.width = `${Math.max(0, Math.min(100, scorePercent))}%`;
+            }, 100);
+        }
+
+        // Reset
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            fileA = null;
+            fileB = null;
+            previewImgA.src = "";
+            previewImgA.classList.add('hidden');
+            iconA.classList.remove('hidden');
+            textA.classList.remove('hidden');
+            badgeA.classList.add('hidden');
+
+            previewImgB.src = "";
+            previewImgB.classList.add('hidden');
+            iconB.classList.remove('hidden');
+            textB.classList.add('hidden');
+            badgeB.classList.add('hidden');
+
+            compareBtn.disabled = true;
+            resultCard.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            errorAlert.classList.add('hidden');
+        });
+
+        // Initialize Translate
+        applyTranslations();
+    </script>
+</body>
+</html>
+
+

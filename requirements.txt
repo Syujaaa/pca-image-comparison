@@ -1,0 +1,6 @@
+Flask
+opencv-python-headless
+numpy==1.26.4
+scikit-learn
+deepface
+tensorflow==2.19.0
