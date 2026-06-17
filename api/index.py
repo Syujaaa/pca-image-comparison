@@ -4,8 +4,6 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify, render_template
 from sklearn.metrics.pairwise import cosine_similarity
-
-# Ganti deepface dengan insightface (ONNX backend)
 from insightface.app import FaceAnalysis
 
 app = Flask(__name__, template_folder='../templates')
