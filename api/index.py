@@ -4,6 +4,8 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify, render_template
 from sklearn.metrics.pairwise import cosine_similarity
+
+# Ganti deepface dengan insightface (ONNX backend)
 from insightface.app import FaceAnalysis
 
 app = Flask(__name__, template_folder='../templates')
@@ -17,14 +19,31 @@ def internal_server_error(e):
     return jsonify({"error": "Terjadi kesalahan internal di server backend Vercel."}), 500
 
 SIMILARITY_THRESHOLD = 0.50
+
+
+print("Memuat model ONNX Face Recognition...")
+# face_app = FaceAnalysis(name='buffalo_sc', providers=['CPUExecutionProvider'])
+face_app = FaceAnalysis(name='buffalo_sc', root='/tmp/.insightface', providers=['CPUExecutionProvider'])
+
+face_app.prepare(ctx_id=0, det_size=(640, 640))
+
+def enhance_image_for_old_photos(img_array):
+    """
+    Fungsi untuk memperbaiki kontras foto lama (masa kecil) menggunakan CLAHE.
+    """
+    lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    cl = clahe.apply(l_channel)
+    
+    merged = cv2.merge((cl, a_channel, b_channel))
+    enhanced_img = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
+    return enhanced_img
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
-
-print("Memuat model ONNX Face Recognition secara Lokal...")
-# OPTIMASI KUNCI: Mengarahkan root ke folder 'api' agar membaca model lokal di 'api/models/buffalo_sc'
-face_app = FaceAnalysis(name='buffalo_sc', root=base_dir, providers=['CPUExecutionProvider'])
-face_app.prepare(ctx_id=0, det_size=(320, 320)) # Dikecilkan ke 320x320 agar kalkulasi Vercel super cepat
-
 model_path = os.path.join(base_dir, 'model_wajah.pkl')
+
 pca_model = None
 is_model_ready = False
 
@@ -64,13 +83,18 @@ def compare_faces(any_path=None):
         if img is None:
             return None, "Gagal membaca format gambar."
             
-        try:
-            faces = face_app.get(img)
-            if len(faces) == 0:
-                return None, "Wajah tidak terdeteksi di salah satu foto."
-            return faces[0].normed_embedding, None
-        except Exception:
-            return None, "Gagal memproses ekstraksi wajah."
+        # Optional: Terapkan CLAHE jika mendeteksi foto lama
+        # img = enhance_image_for_old_photos(img)
+            
+        # Ekstraksi fitur menggunakan ONNX
+        faces = face_app.get(img)
+        
+        if len(faces) == 0:
+            return None, "Wajah tidak terdeteksi di salah satu foto."
+            
+        # Ambil wajah pertama/terbesar yang terdeteksi
+        # InsightFace otomatis melakukan alignment (meluruskan wajah)
+        return faces[0].normed_embedding, None
 
     emb1, err1 = get_onnx_embedding(file1)
     if err1: return jsonify({"error": err1}), 400
@@ -79,15 +103,18 @@ def compare_faces(any_path=None):
     if err2: return jsonify({"error": err2}), 400
         
     try:
+        # 1. Hitung Kemiripan dari Fitur ONNX Murni (Cosine Similarity)
         sim_onnx = float(cosine_similarity([emb1], [emb2])[0][0])
 
+        # 2. Transformasi vektor lewat PCA
         vec1 = pca_model.transform([emb1])[0]
         vec2 = pca_model.transform([emb2])[0]
         
+        # Hitung Kemiripan dari ruang PCA
         sim_pca = float(cosine_similarity([vec1], [vec2])[0][0])
         eucl_dist = float(np.linalg.norm(vec1 - vec2))
         
-        # Hybrid scoring yang seimbang
+        # HYBRID SCORING (Ensemble)
         hybrid_score = (sim_onnx * 0.70) + (sim_pca * 0.30)
         display_similarity = max(0.0, hybrid_score)
         is_match = bool(display_similarity >= SIMILARITY_THRESHOLD)
