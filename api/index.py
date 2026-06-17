@@ -16,40 +16,26 @@ def page_not_found(e):
 def internal_server_error(e):
     return jsonify({"error": "Terjadi kesalahan internal di server backend Vercel."}), 500
 
-# THRESHOLD DITURUNKAN SEDIKIT: Karena kita sangat memperketat fokus wajah, 
-# nilai 0.45 - 0.48 adalah titik potong aman untuk kasus beda usia yang ekstrem.
-SIMILARITY_THRESHOLD = 0.45
+# KALIBRASI THRESHOLD: Untuk wajah beda usia (anak vs dewasa) dengan PCA, 
+# nilai 0.58 - 0.60 adalah titik potong optimal agar tidak terjadi False Rejection.
+SIMILARITY_THRESHOLD = 0.50
 
 def enhance_image_for_old_photos(img_array):
     """
-    Prapemrosesan Lanjutan: Denoise -> CLAHE -> Sharpening.
-    Dirancang khusus untuk memunculkan struktur T-Zone pada foto lawas/anak-anak.
+    Fungsi untuk memperbaiki kontras foto lama (masa kecil) menggunakan CLAHE.
     """
-    # 1. Denoising (Menghilangkan bintik noise dari kamera/scan lama)
-    denoised = cv2.fastNlMeansDenoisingColored(img_array, None, 5, 5, 7, 15)
-    
-    # 2. CLAHE pada L-channel (Meningkatkan kontras tanpa merusak warna)
-    lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
+    # Konversi ke LAB color space
+    lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
     l_channel, a_channel, b_channel = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8,8))
+    
+    # Terapkan CLAHE hanya pada L-channel (Lightness) agar warna tidak rusak
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     cl = clahe.apply(l_channel)
+    
+    # Gabungkan kembali dan konversi ke BGR
     merged = cv2.merge((cl, a_channel, b_channel))
-    contrast_img = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
-    
-    # 3. Sharpening (Mempertegas tepi mata, hidung, mulut)
-    kernel = np.array([[0, -1, 0],
-                       [-1, 5,-1],
-                       [0, -1, 0]])
-    sharpened_img = cv2.filter2D(contrast_img, -1, kernel)
-    
-    return sharpened_img
-
-def l2_normalize(vector):
-    """Normalisasi L2 agar perhitungan cosine similarity lebih stabil."""
-    norm = np.linalg.norm(vector)
-    if norm == 0:
-        return vector
-    return vector / norm
+    enhanced_img = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
+    return enhanced_img
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(base_dir, 'model_wajah.pkl')
@@ -69,9 +55,7 @@ if os.path.exists(model_path):
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
-@app.route("/health")
-def health():
-    return {"status": "ok"}
+
 @app.route('/api/compare', methods=['POST'])
 @app.route('/compare', methods=['POST'])
 def compare_faces(any_path=None):
@@ -84,7 +68,7 @@ def compare_faces(any_path=None):
     file1 = request.files['file1']
     file2 = request.files['file2']
     
-    def get_deepface_embedding(file_obj, is_old_photo=False):
+    def get_deepface_embedding(file_obj):
         if file_obj.filename == '':
             return None, "Berkas kosong."
             
@@ -95,52 +79,48 @@ def compare_faces(any_path=None):
         if img is None:
             return None, "Gagal membaca format gambar."
             
-        if is_old_photo:
-            img = enhance_image_for_old_photos(img)
-            
         try:
-            # UPGRADE LOGIKA PENGENALAN
+            # UPGRADE 1: Tambahkan align=True untuk meluruskan rotasi wajah
             results = DeepFace.represent(
-                img_path=img, 
+                img, 
                 model_name="ArcFace", 
-                detector_backend="retinaface",
                 enforce_detection=True, 
-                align=True,
-                # expand_percentage=0 memaksa model hanya melihat T-Zone inti 
-                # (mengabaikan pipi tembam anak/rahang yang belum tumbuh)
-                expand_percentage=0 
+                align=True 
             )
-            # Terapkan L2 Normalization pada output murni
-            raw_embedding = results[0]["embedding"]
-            norm_embedding = l2_normalize(raw_embedding)
-            return norm_embedding, None
+            return results[0]["embedding"], None
         except ValueError:
-            return None, "Wajah tidak terdeteksi. Pastikan pencahayaan cukup dan wajah tidak tertutup."
+            return None, "Wajah tidak terdeteksi di salah satu foto."
 
-    emb1, err1 = get_deepface_embedding(file1, is_old_photo=True)
+    emb1, err1 = get_deepface_embedding(file1)
     if err1: return jsonify({"error": err1}), 400
         
-    emb2, err2 = get_deepface_embedding(file2, is_old_photo=False)
+    emb2, err2 = get_deepface_embedding(file2)
     if err2: return jsonify({"error": err2}), 400
         
     try:
+        # 1. Hitung Kemiripan dari Fitur ArcFace Murni (Sangat kuat untuk beda usia)
         sim_arcface = float(cosine_similarity([emb1], [emb2])[0][0])
 
+        # 2. Transformasi vektor ArcFace lewat "kacamata" PCA (Sesuai syarat modelmu)
         vec1 = pca_model.transform([emb1])[0]
         vec2 = pca_model.transform([emb2])[0]
         
+        # Hitung Kemiripan dari ruang PCA
         sim_pca = float(cosine_similarity([vec1], [vec2])[0][0])
         eucl_dist = float(np.linalg.norm(vec1 - vec2))
         
-        # PENGURANGAN BOBOT PCA: Model PCA standar sangat buruk untuk lintas-usia.
-        # Kita ambil 90% keputusan dari ArcFace yang sudah dimaksimalkan, dan hanya 10% dari PCA.
-        hybrid_score = (sim_arcface * 0.90) + (sim_pca * 0.10)
+        # UPGRADE 2: HYBRID SCORING (Ensemble)
+        # Kita ambil 70% keputusan dari ArcFace yang kebal usia, dan 30% dari PCA
+        hybrid_score = (sim_arcface * 0.70) + (sim_pca * 0.30)
         
+        # Normalisasi agar tidak minus
         display_similarity = max(0.0, hybrid_score)
+        
         is_match = bool(display_similarity >= SIMILARITY_THRESHOLD)
         
-        if display_similarity >= 0.60: confidence = "Sangat Tinggi"
-        elif display_similarity >= 0.50: confidence = "Tinggi"
+        # Penyesuaian label keyakinan yang lebih realistis untuk hybrid score
+        if display_similarity >= 0.70: confidence = "Sangat Tinggi"
+        elif display_similarity >= 0.60: confidence = "Tinggi"
         elif display_similarity >= SIMILARITY_THRESHOLD: confidence = "Sedang"
         else: confidence = "Rendah"
             
@@ -150,11 +130,7 @@ def compare_faces(any_path=None):
             "similarity": round(display_similarity, 4),
             "distance": round(eucl_dist, 3),
             "threshold": SIMILARITY_THRESHOLD,
-            "confidence": confidence,
-            "details": {
-                "arcface_score": round(sim_arcface, 4),
-                "pca_score": round(sim_pca, 4)
-            }
+            "confidence": confidence
         })
         
     except Exception as e:
