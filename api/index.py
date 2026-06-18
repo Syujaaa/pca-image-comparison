@@ -2,19 +2,25 @@ import os
 import cv2
 import pickle
 import numpy as np
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from sklearn.metrics.pairwise import cosine_similarity
 from insightface.app import FaceAnalysis
 
 app = Flask(__name__, template_folder='../templates')
 
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+
 @app.errorhandler(404)
 def page_not_found(e):
-    return jsonify({"error": "Jalur API tidak ditemukan. Cek vercel.json Anda."}), 404
+    return jsonify({"error": "Jalur API tidak ditemukan."}), 404
 
 @app.errorhandler(500)
 def internal_server_error(e):
     return jsonify({"error": "Terjadi kesalahan internal di server backend Vercel."}), 500
+
+@app.errorhandler(413)
+def request_entity_too_large(e):
+    return jsonify({"error": "Ukuran gambar terlalu besar. Maksimal batas unggah adalah 5MB."}), 413
 
 SIMILARITY_THRESHOLD = 0.50
 
@@ -53,6 +59,11 @@ if os.path.exists(model_path):
         is_model_ready = True
     except Exception as e:
         print(f"Error memuat model PCA: {str(e)}")
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/', methods=['GET'])
 def index():
