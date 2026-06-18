@@ -213,6 +213,7 @@
                 distLabel: "Jarak Euclidean",
                 threshLabel: "Ambang Batas",
                 confLabel: "Keyakinan",
+                fileTooLarge: "Ukuran file terlalu besar. Maksimal 5MB.",
                 footer: "© 2026 BioID Core System. Project penerapan PCA Mata Kuliah Aljabar Linear. Foto tidak disimpan pada server kami"
             },
             en: {
@@ -237,6 +238,7 @@
                 distLabel: "Euclidean Distance",
                 threshLabel: "Threshold",
                 confLabel: "Confidence",
+                fileTooLarge: "File size is too large. Maximum is 5MB.",
                 footer: "© 2026 BioID Core System. PCA Implementation Project for Linear Algebra Course. Pictures are not stored on our server"
             }
         };
@@ -320,18 +322,35 @@
 
         function handleFile(file, slot) {
             if (!file) return;
+
+            const maxSizeInBytes = 5 * 1024 * 1024; // 5 MB
+            if (file.size > maxSizeInBytes) {
+                errorMessage.textContent = translations[currentLang].fileTooLarge;
+                errorAlert.classList.remove('hidden');
+                
+                // Reset input agar bisa pilih ulang file yang sama
+                if (slot === 'A') inputA.value = '';
+                else inputB.value = '';
+                
+                return; // Hentikan eksekusi di sini
+            }
+
+             errorAlert.classList.add('hidden');
+
             if (slot === 'A') {
                 fileA = file;
                 previewImgA.src = URL.createObjectURL(file);
                 previewImgA.classList.remove('hidden');
                 iconA.classList.add('hidden');
                 textA.classList.add('hidden');
+                badgeA.classList.remove('hidden');
             } else {
                 fileB = file;
                 previewImgB.src = URL.createObjectURL(file);
                 previewImgB.classList.remove('hidden');
                 iconB.classList.add('hidden');
                 textB.classList.add('hidden');
+                badgeB.classList.remove('hidden');
             }
 
             if (fileA && fileB) {
